@@ -1,0 +1,124 @@
+
+DOCKER SWARM SETUP COMMANDS
+
+==================================================================================================================
+CONSUL AGENTS IN SERVER MODE
+---------------------------------------------
+
+MANAGER1
+docker run --restart=unless-stopped -d -h consul1 --name consul1 -v /consul:/data \
+    -p 172.27.59.21:8300:8300 \
+    -p 172.27.59.21:8301:8301 \
+    -p 172.27.59.21:8301:8301/udp \
+    -p 172.27.59.21:8302:8302 \
+    -p 172.27.59.21:8302:8302/udp \
+    -p 172.27.59.21:8400:8400 \
+    -p 172.27.59.21:8500:8500 \
+    -p 172.17.0.1:53:53/udp \
+    progrium/consul -server -advertise 172.27.59.21 -bootstrap-expect 3
+	
+	
+MANAGER2
+	docker run --restart=unless-stopped -d -h consul2 --name consul2 -v /consul:/data \
+    -p 172.27.59.118:8300:8300 \
+    -p 172.27.59.118:8301:8301 \
+    -p 172.27.59.118:8301:8301/udp \
+    -p 172.27.59.118:8302:8302 \
+    -p 172.27.59.118:8302:8302/udp \
+    -p 172.27.59.118:8400:8400 \
+    -p 172.27.59.118:8500:8500 \
+    -p 172.17.0.1:53:53/udp \
+    progrium/consul -server -advertise 172.27.59.118 -join 172.27.59.21
+	
+	
+MANAGER3
+	docker run --restart=unless-stopped -d -h consul3 --name consul3  -v /consul:/data  \
+    -p 172.27.59.160:8300:8300 \
+    -p 172.27.59.160:8301:8301 \
+    -p 172.27.59.160:8301:8301/udp \
+    -p 172.27.59.160:8302:8302 \
+    -p 172.27.59.160:8302:8302/udp \
+    -p 172.27.59.160:8400:8400 \
+    -p 172.27.59.160:8500:8500 \
+    -p 172.17.0.1:53:53/udp \
+    progrium/consul -server -advertise 172.27.59.160 -join 172.27.59.21
+==================================================================================================================
+	
+============================================================================================================================================================
+SWARM MANAGER COMMANDS	
+------------------------------------
+MANAGER1
+	docker run --restart=unless-stopped -h mgr1 --name manager1 -d -p 3375:2375 swarm manage --replication --advertise 172.27.59.21:3375 consul://172.27.59.21:8500/
+	
+MANAGER2
+	docker run --restart=unless-stopped -h mgr2 --name manager2 -d -p 3375:2375 swarm manage --replication --advertise 172.27.59.118:3375 consul://172.27.59.118:8500/
+		
+MANAGER3
+	docker run --restart=unless-stopped -h mgr3 --name manager3 -d -p 3375:2375 swarm manage --replication --advertise 172.27.59.160:3375 consul://172.27.59.160:8500/
+
+==================================================================================================================================================	
+
+==================================================================================================================================================	
+CONSUL AGENTS IN CLIENT MODE
+-------------------------------------------
+NODE1
+	docker run --restart=unless-stopped -d -h consul-agt1 --name consul-agt1 \
+	-p 8300:8300 \
+	-p 8301:8301 -p 8301:8301/udp \
+	-p 8302:8302 -p 8302:8302/udp \
+	-p 8400:8400 \
+	-p 8500:8500 \
+	-p 8600:8600/udp \
+	progrium/consul -rejoin -advertise 172.27.59.214 -join 172.27.59.21
+	
+NODE2
+		docker run --restart=unless-stopped -d -h consul-agt6 --name consul-agt6 \
+	-p 8300:8300 \
+	-p 8301:8301 -p 8301:8301/udp \
+	-p 8302:8302 -p 8302:8302/udp \
+	-p 8400:8400 \
+	-p 8500:8500 \
+	-p 8600:8600/udp \
+	progrium/consul -rejoin -advertise 172.27.59.112 -join 172.27.59.21
+	
+	
+	
+NODE3
+	docker run --restart=unless-stopped -d -h consul-agt3 --name consul-agt3 \
+	-p 8300:8300 \
+	-p 8301:8301 -p 8301:8301/udp \
+	-p 8302:8302 -p 8302:8302/udp \
+	-p 8400:8400 \
+	-p 8500:8500 \
+	-p 8600:8600/udp \
+	progrium/consul -rejoin -advertise 172.27.59.252 -join 172.27.59.21
+
+==================================================================================================================	
+	
+SWARM JOIN COMMANDS	
+------------------------------
+	
+NODE1
+		docker run  --restart=unless-stopped  -d swarm join --advertise=172.27.59.214:2375 consul://172.27.59.214:8500/
+NODE2
+		docker run --restart=unless-stopped -d swarm join --advertise=172.27.59.112:2375 consul://172.27.59.112:8500/
+NODE3
+		docker run --restart=unless-stopped -d swarm join --advertise=172.27.59.252:2375 consul://172.27.59.252:8500/
+		
+==================================================================================================================
+
+REGISTRATOR 
+	docker run --restart=unless-stopped -d --name registrator -h registrator -v /var/run/docker.sock:/tmp/docker.sock gliderlabs/registrator:latest consul://172.27.59.21:8500
+
+	
+export DOCKER_HOST=tcp://172.27.59.115:3375	
+	
+cAdvisor:
+
+
+docker run -d --name=cadvisor -p 8090:8080 --volume=/var/run:/var/run:rw --volume=/sys:/sys:ro --volume=/var/lib/docker/:/var/lib/docker:ro google/cadvisor:latest
+
+node-exporter:
+
+docker run -d -p 9100:9100 -v "/proc:/host/proc" -v "/sys:/host/sys" -v "/:/rootfs" --net="host" prom/node-exporter -collector.procfs /host/proc -collector.sysfs /host/proc -collector.filesystem.ignored-mount-points "^/(sys|proc|dev|host|etc)($|/)"
+
